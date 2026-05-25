@@ -5,7 +5,8 @@ import { z } from "zod";
 
 export const runtime = "edge";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend with a dummy key fallback to prevent build-time errors when the env var is not present.
+const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key_for_build_purposes");
 
 const rateLimit = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 3;
@@ -29,6 +30,11 @@ const Email = z.object({
 });
 export async function POST(req: Request) {
   try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY is not defined in the environment variables.");
+      return Response.json({ error: "Email service is not configured." }, { status: 500 });
+    }
+
     const ip = req.headers.get("x-forwarded-for") ?? "unknown";
     if (isRateLimited(ip)) {
       return Response.json({ error: "Too many requests. Please try again later." }, { status: 429 });
